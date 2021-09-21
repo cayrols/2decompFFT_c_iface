@@ -1,8 +1,13 @@
 include ../../../src/Makefile.inc
 
-CFLAGS+=-g
-INCLUDE = -I../../../include -I ../../../iverb/include/C
-LIBS = -L../../../lib -l2decomp_fft $(LIBFFT) -L ../../../iverb/interface/C/build -llog -lgomp
+#CFLAGS+=-g
+INCLUDE = -I../../../include 
+LIBS = -L../../../lib -l2decomp_fft $(LIBFFT)
+ifdef WITH_LOGGER
+INCLUDE+= -I ../../../iverb/include/C
+LIBS+= -L ../../../iverb/interface/C/build -llog -lgomp
+OPTIONS+= -D WITH_LOGGER
+endif
 OBJ = 2decomp_c2c_mpi.o 
 TARGETS=$(OBJ:.o=)
 

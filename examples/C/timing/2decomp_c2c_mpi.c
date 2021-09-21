@@ -5,7 +5,11 @@
 #include <mpi.h>
 #include <decomp_2d_iface.h>
 #include <string.h>
+#ifdef WITH_LOGGER
 #include <Log.h>
+#else
+#define log_print(_a, _b, _c, ...)
+#endif
 
 
 int main(int argc, char **argv){
@@ -37,6 +41,7 @@ int main(int argc, char **argv){
   ny = atoi(argv[2]);
   nz = atoi(argv[3]);
 
+#ifdef WITH_LOGGER
   if ( argc > 4 ) {
     if ( ! strcmp( argv[4], "-v" ) ) {
       int lvl = (argc > 5) ? atoi( argv[4] ) : info;
@@ -46,6 +51,7 @@ int main(int argc, char **argv){
     //log_on( comp, details );
     }
   }
+#endif
   
 //nx = 32;
 
