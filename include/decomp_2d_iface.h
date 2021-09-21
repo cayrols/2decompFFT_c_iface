@@ -17,7 +17,9 @@ extern void decomp_2d_init(int nx, int ny, int nz, int p_row, int p_col);
 
 extern void decomp_2d_fft_init(int physical);
 
-extern void decomp_2d_get_local_sizes(int *xsize, int *ysize, int *zsize);
+//extern void decomp_2d_get_local_start(int dim, int *xstart, int *ystart, int *zstart);
+
+extern void decomp_2d_get_local_sizes(int physical, int *size_0, int *size_1, int *size_2);
 
 // Direction is either DECOMP_2D_FFT_FORWARD or DECOMP_2D_FFT_BACKWARD
 //extern void decomp_2d_fft_3d_c2c( double complex  *data_in,

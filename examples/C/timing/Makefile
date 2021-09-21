@@ -1,8 +1,8 @@
 include ../../../src/Makefile.inc
 
-INCLUDE = -I../../../include
-LIBS = -L../../../lib -l2decomp_fft $(LIBFFT)
-
+CFLAGS+=-g
+INCLUDE = -I../../../include -I ../../../iverb/include/C
+LIBS = -L../../../lib -l2decomp_fft $(LIBFFT) -L ../../../iverb/interface/C/build -llog -lgomp
 OBJ = 2decomp_c2c_mpi.o 
 TARGETS=$(OBJ:.o=)
 
@@ -17,4 +17,4 @@ clean:
 	rm -f *.o 2decomp_c2c_mpi
 
 %.o : %.c
-	gcc $(INCLUDE) $(OPTIONS) -c $<
+	gcc $(INCLUDE) $(OPTIONS) -c $< $(CFLAGS)

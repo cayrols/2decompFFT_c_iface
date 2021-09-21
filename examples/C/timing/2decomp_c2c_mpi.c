@@ -4,6 +4,8 @@
 #include <complex.h>
 #include <mpi.h>
 #include <decomp_2d_iface.h>
+#include <string.h>
+#include <Log.h>
 
 
 int main(int argc, char **argv){
@@ -22,6 +24,7 @@ int main(int argc, char **argv){
   int nz = 8;
   int p_row, p_col;
   int i, j, k;
+  int physical = PHYSICAL_IN_X;
   double scaling = 0.0;
   MPI_Comm comm;
 
@@ -33,20 +36,36 @@ int main(int argc, char **argv){
   nx = atoi(argv[1]);
   ny = atoi(argv[2]);
   nz = atoi(argv[3]);
+
+  if ( argc > 4 ) {
+    if ( ! strcmp( argv[4], "-v" ) ) {
+      int lvl = (argc > 5) ? atoi( argv[4] ) : info;
+
+      log_on( algo, lvl );
+      log_on( alloc, details );
+    //log_on( comp, details );
+    }
+  }
   
-  nx = 32;
+//nx = 32;
 
   p_row = 0; // The library will handle it
   p_col = 0; // The library will handle it
+
+  // FORCE for testing
+  physical = PHYSICAL_IN_X;
 
   scaling = 1 / (  (double)nx * ny * nz );
 
   MPI_Init(&argc, &argv);
   MPI_Comm_dup ( MPI_COMM_WORLD, &comm );
 
+  log_print( algo, info, "Initialize decomp_2d_init\n" );
   decomp_2d_init( nx, ny, nz, p_row, p_col );
+
   MPI_Barrier( comm );
-  decomp_2d_fft_init(PHYSICAL_IN_X);
+  log_print( algo, info, "Initialize decomp_2d_fft_init\n" );
+  decomp_2d_fft_init(physical);
 
   MPI_Comm_rank ( comm, &rank );
   MPI_Comm_size ( comm, &size );
@@ -63,19 +82,35 @@ int main(int argc, char **argv){
   int lxsize = 0;
   int lysize = 0;
   int lzsize = 0;
-  double complex *data = NULL;
+  int dim = 0;
+  double complex *data_in  = NULL;
+  double complex *data_out = NULL;
   double complex *ref = NULL;
 
-  decomp_2d_get_local_sizes( &lxsize, &lysize, &lzsize);
+  decomp_2d_get_local_sizes(physical, &lxsize, &lysize, &lzsize);
+  log_print( alloc, details, "RETURNED lxsize=%d\tlysize=%d\tlzsize=%d\n",
+      lxsize, lysize, lzsize );
+
+//lxsize = nx;
+//lysize = ny;
+//lzsize = nz;
+//log_print( alloc, details, "OVERWRITTEN lxsize=%d\tlysize=%d\tlzsize=%d\n",
+//    lxsize, lysize, lzsize );
 
   size_t localsize = lxsize * lysize * lzsize * sizeof(double complex);
-  printf( "Local size = %zu\n", localsize );
+  log_print( alloc, info, "Local size = %zu\n", localsize );
 
-  MPI_Barrier( comm );
+//MPI_Barrier( comm );
+//goto finalize;
 
-#if 1
-  data = (double complex*) malloc ( localsize );
-  if ( ! data ) {
+  data_in = (double complex*) malloc ( localsize );
+  if ( ! data_in ) {
+    fprintf( stderr, "Error, cannot allocate data of size %zu\n",
+      localsize);
+    goto finalize;
+  }
+  data_out = (double complex*) malloc ( localsize );
+  if ( ! data_out ) {
     fprintf( stderr, "Error, cannot allocate data of size %zu\n",
       localsize);
     goto finalize;
@@ -87,17 +122,26 @@ int main(int argc, char **argv){
     goto finalize;
   }
 
+#if 1
   /*initialize rin to some functionmy_func(x,y,z) */
   for (i = 0; i < lxsize; ++i) {
-    double tmp_x = i / nx;
+    double tmp_x = ((double)i) / nx;
     for (j = 0; j < lysize; ++j) {
-      double tmp_y = j / ny;
+      double tmp_y = ((double)j) / ny;
       for (k = 0; k < lzsize; ++k) {
-        double tmp_z = (k/nz); 
+        double tmp_z = ((double)k) / nz; 
       //data[(i*M + j) * N + k] = rand() / ((double) RAND_MAX ) + 0 * I;
       //ref [(i*M + j) * N + k] = data[(i*M + j) * N + k];
-        data[(i*lysize + j) * lzsize + k] = tmp_x * tmp_y * tmp_z;
-        ref [(i*lysize + j) * lzsize + k] = data[(i*lysize + j) * lzsize + k];
+      //double complex entry = 3 + 2*I;
+        double complex entry = tmp_x * tmp_y * tmp_z;
+        data_in[(i*lysize + j) * lzsize + k] = entry;
+        ref [(i*lysize + j) * lzsize + k]    = data_in[(i*lysize + j) * lzsize + k];
+
+        log_print( comp, details, "ref[%d]=(%.2e,%.2e)\n",
+          (i*lysize + j) * lzsize + k,
+          creal( ref [(i*lysize + j) * lzsize + k] ),
+          cimag( ref [(i*lysize + j) * lzsize + k] ) );
+
       }
     }
   }
@@ -111,28 +155,44 @@ int main(int argc, char **argv){
   double max_tn = 0.0;
   
   // Warmup
-  decomp_2d_fft_3d_c2c( lxsize, lysize, lzsize, ref, 
-      lxsize, lysize, lzsize, data, FORWARD );
-  decomp_2d_fft_3d_c2c( lxsize, lysize, lzsize, data, 
-      lxsize, lysize, lzsize, data, BACKWARD );
+  log_print( algo, info, "Warmup\n" );
+  log_print( algo, info, "FORWARD\n" );
+  decomp_2d_fft_3d_c2c( lxsize, lysize, lzsize, data_in, 
+      lxsize, lysize, lzsize, data_out, FORWARD );
+
+  MPI_Barrier( comm );
+  log_print( comp, details, "data_out[%d]=(%.2e,%.2e)\n",
+      0, creal( data_out [0] ), cimag( data_out [0] ) );
+//goto finalize;
+
+  log_print( algo, info, "BACKWARD\n" );
+  decomp_2d_fft_3d_c2c( lxsize, lysize, lzsize, data_out, 
+      lxsize, lysize, lzsize, data_in, BACKWARD );
+  MPI_Barrier( comm );
+  log_print( comp, details, "data_in[%d]=(%.2e,%.2e)\n",
+      0, creal( data_out [0] ), cimag( data_out [0] ) );
 
   // Normalization
+  log_print( algo, info, "NORMALIZATION\n" );
   for (i = 0; i < lxsize; ++i)
     for (j = 0; j < lysize; ++j)
       for (k = 0; k < lzsize; ++k) {
-        data[(i*lysize + j) * lzsize + k] *= scaling;
+        data_in[(i*lysize + j) * lzsize + k] *= scaling;
       }
+  log_print( comp, details, "AFTER Normalization: data_in[%d]=(%.2e,%.2e)\n",
+      0, creal( data_out [0] ), cimag( data_out [0] ) );
 
+  log_print( algo, info, "Main loop\n" );
   MPI_Barrier( comm );
   for ( int iter = 0; iter < niter; ++iter ) {
     ti = MPI_Wtime();
-    decomp_2d_fft_3d_c2c( lxsize, lysize, lzsize, ref, 
-        lxsize, lysize, lzsize, data, FORWARD );
+    decomp_2d_fft_3d_c2c( lxsize, lysize, lzsize, data_in, 
+        lxsize, lysize, lzsize, data_out, FORWARD );
     tfwd[iter] = MPI_Wtime() - ti;
 
     tmp = MPI_Wtime();
-    decomp_2d_fft_3d_c2c( lxsize, lysize, lzsize, data, 
-        lxsize, lysize, lzsize, data, BACKWARD );
+    decomp_2d_fft_3d_c2c( lxsize, lysize, lzsize, data_out, 
+        lxsize, lysize, lzsize, data_in, BACKWARD );
     tbwd[iter] = MPI_Wtime() - tmp;
     titer[iter] = MPI_Wtime() - ti;
     tn += titer[iter];
@@ -141,9 +201,11 @@ int main(int argc, char **argv){
     for (i = 0; i < lxsize; ++i)
       for (j = 0; j < lysize; ++j)
         for (k = 0; k < lzsize; ++k) {
-          data[(i*lysize + j) * lzsize + k] *= scaling;
+          data_in[(i*lysize + j) * lzsize + k] *= scaling;
         }
     
+    log_print( algo, info, "iter %d: fwd=%.2e\tbwd=%.2e\n",
+      iter, tfwd[iter], tbwd[iter] );
     MPI_Barrier ( comm );
   }
 
@@ -165,7 +227,11 @@ int main(int argc, char **argv){
     for (j = 0; j < lysize; ++j)
       for (k = 0; k < lzsize; ++k) {
         double complex cref_tmp   = ref[(i*lysize + j) * lzsize + k];
-        double complex cdata_tmp  = data[(i*lysize + j) * lzsize + k];
+        double complex cdata_tmp  = data_in[(i*lysize + j) * lzsize + k];
+        log_print( comp, details, "data_in[%d]=(%.2e,%.2e)\n",
+          (i*lysize + j) * lzsize + k,
+          creal( cdata_tmp ),
+          cimag( cdata_tmp ) );
         double tmp_r = creal(cref_tmp) - creal(cdata_tmp);
         double tmp_i = cimag(cref_tmp) - cimag(cdata_tmp);
         err += sqrt(tmp_r*tmp_r + tmp_i * tmp_i);
@@ -175,11 +241,20 @@ int main(int argc, char **argv){
       }
 
   MPI_Reduce ( &ierr, &max_ierr, 1, MPI_DOUBLE, MPI_MAX, 0, comm );
-
+/*
+     n1 = real(nx,mytype) * real(ny,mytype) * real(nz,mytype)
+     n1 = n1 ** (1._mytype/3._mytype)
+     ! 5n*log(n) flops per 1D FFT of size n using Cooley-Tukey algorithm
+     flops = 5._mytype * n1 * log(n1) / log(2.0_mytype)
+     ! 3 sets of 1D FFTs for 3 directions, each having n^2 1D FFTs
+     flops = flops * 3._mytype * n1**2  
+     flops = 2._mytype * flops / ((t1+t3)/real(NTEST,mytype))
+     write(*,*) 'GFLOPS : ', flops / 1000._mytype**3
+*/
   // Computation of the flops
   double fwdAdd, fwdMul, fwdFma;
   double bwdAdd, bwdMul, bwdFma;
-  double n1 = ((double)nx * ny * nz) / 3.;
+  double n1 = pow( (double)nx * ny * nz, 1./3. );
   double flops = 5. * n1 * log(n1) / log(2);
   flops *= 3. * n1 * n1;
 
@@ -197,7 +272,7 @@ int main(int argc, char **argv){
         nx, ny, nz,
         size,
         niter, max_tn,
-        ( 2 * flops ) * niter / max_tn,
+        (( 2 * flops ) / (max_tn / niter)) / ( 1024l * 1024l * 1024l ),
         max_ierr );
 
     // Print some details
@@ -219,14 +294,15 @@ int main(int argc, char **argv){
     printf ( "]\n" );
   }
 
-finalize:
 
+finalize:
 //decomp_2d_fft_finalize();
-  decomp_2d_finalize();
+//decomp_2d_finalize();
 #endif
 
-  if ( data ) free ( data );
-  if ( ref ) free ( ref );
+//if ( data_in ) free ( data_in );
+//if ( data_out ) free ( data_out );
+//if ( ref ) free ( ref );
 
   if ( titer ) free ( titer );
   if ( tfwd ) free ( tfwd );

@@ -16,45 +16,64 @@ subroutine decomp_2d_c_init(nx, ny, nz, p_row, p_col) &
   integer(C_INT),   value :: p_row
   integer(C_INT),   value :: p_col
 
- !call decomp_2d_init(nx, ny, nz, p_row, p_col)
-  call decomp_2d_init(32, 32, 32, 0, 0)
+  call decomp_2d_init(nx, ny, nz, p_row, p_col)
 end subroutine decomp_2d_c_init
 
-subroutine decomp_2d_c_fft_init(pencil) &
+subroutine decomp_2d_c_fft_init(cpencil) &
   bind(C, name="decomp_2d_fft_init")
   use decomp_2d_fft
   use iso_c_binding
   implicit none
 
-  integer(C_INT),   value :: pencil
+  integer(C_INT),   value :: cpencil
 
   integer                 :: fpencil
 
   ! This test is based on the values of the enum created in the header
   ! file
-  if(pencil.eq.1) then
+  if(cpencil.eq.1) then
     fpencil = PHYSICAL_IN_Z
   else
     fpencil = PHYSICAL_IN_X
   end if
 
- !call decomp_2d_fft_init( fpencil )
-  call decomp_2d_fft_init( PHYSICAL_IN_Z )
+  call decomp_2d_fft_init( fpencil )
 end subroutine decomp_2d_c_fft_init
 
-subroutine decomp_2d_c_get_local_sizes(cxsize, cysize, czsize) &
+subroutine decomp_2d_c_get_local_sizes(cpencil, csize_0, csize_1, csize_2) &
   bind(C, name="decomp_2d_get_local_sizes")
+  use decomp_2d_fft, only: PHYSICAL_IN_X, PHYSICAL_IN_Z
   use decomp_2d
   use iso_c_binding
   implicit none
 
-  integer(C_INT),   intent(out) :: cxsize
-  integer(C_INT),   intent(out) :: cysize
-  integer(C_INT),   intent(out) :: czsize
+  integer(C_INT),   value       :: cpencil
+  integer(C_INT),   intent(out) :: csize_0
+  integer(C_INT),   intent(out) :: csize_1
+  integer(C_INT),   intent(out) :: csize_2
 
-  cxsize = xsize(1) ! For now, we try the first entry of this 3-entry array
-  cysize = ysize(1) ! For now, we try the first entry of this 3-entry array
-  czsize = zsize(1) ! For now, we try the first entry of this 3-entry array
+  integer                       :: fpencil
+  ! This test is based on the values of the enum created in the header
+  ! file
+  if(cpencil.eq.1) then
+    fpencil = PHYSICAL_IN_Z
+  else
+    fpencil = PHYSICAL_IN_X
+  end if
+
+  if(fpencil.eq.PHYSICAL_IN_X) then
+    csize_0 = xsize(1)
+    csize_1 = xsize(2)
+    csize_2 = xsize(3)
+  else
+    csize_0 = zsize(1)
+    csize_1 = zsize(2)
+    csize_2 = zsize(3)
+  end if
+
+ !cxsize = xsize(1) ! For now, we try the first entry of this 3-entry array
+ !cysize = ysize(2) ! For now, we try the first entry of this 3-entry array
+ !czsize = zsize(3) ! For now, we try the first entry of this 3-entry array
 end subroutine decomp_2d_c_get_local_sizes
 
 !subroutine decomp_2d_c_fft_3d_c2c(cdata_in, cdata_out, direction) &
