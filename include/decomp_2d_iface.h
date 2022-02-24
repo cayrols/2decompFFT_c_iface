@@ -3,6 +3,10 @@
 
 #include <complex.h>
 
+#ifdef __cplusplus /* If this is a C++ compiler, use C linkage */
+extern "C" {
+#endif
+
 enum {
   PHYSICAL_IN_X=0,
   PHYSICAL_IN_Z=1,
@@ -36,5 +40,9 @@ extern void decomp_2d_fft_3d_c2c( int nx_in, int ny_in, int nz_in,
 extern void decomp_2d_fft_finalize();
 
 extern void decomp_2d_finalize();
+
+#ifdef __cplusplus /* If this is a C++ compiler, use C linkage */
+}
+#endif
 
 #endif
